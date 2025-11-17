@@ -16,7 +16,7 @@ struct whisper_engine {
 
 static char last_error[256] = {0};
 
-whisper_engine_t* whisper_init(const char *model_path, transcription_callback_t callback, void *user_data) {
+whisper_engine_t* whisper_engine_init(const char *model_path, transcription_callback_t callback, void *user_data) {
     if (!model_path || !callback) {
         snprintf(last_error, sizeof(last_error), "Invalid parameters");
         return NULL;
@@ -60,7 +60,7 @@ whisper_engine_t* whisper_init(const char *model_path, transcription_callback_t 
     return engine;
 }
 
-bool whisper_process(whisper_engine_t *engine, const float *samples, size_t num_samples) {
+bool whisper_engine_process(whisper_engine_t *engine, const float *samples, size_t num_samples) {
     if (!engine || !samples || num_samples == 0) {
         snprintf(last_error, sizeof(last_error), "Invalid parameters");
         return false;
@@ -110,7 +110,7 @@ bool whisper_process(whisper_engine_t *engine, const float *samples, size_t num_
     return true;  /* No error, just no speech detected */
 }
 
-void whisper_cleanup(whisper_engine_t *engine) {
+void whisper_engine_cleanup(whisper_engine_t *engine) {
     if (!engine) return;
 
     pthread_mutex_lock(&engine->lock);
@@ -126,6 +126,6 @@ void whisper_cleanup(whisper_engine_t *engine) {
     fprintf(stderr, "[Whisper] Cleanup complete\n");
 }
 
-const char* whisper_get_error(void) {
+const char* whisper_engine_get_error(void) {
     return last_error;
 }

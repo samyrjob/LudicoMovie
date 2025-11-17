@@ -53,7 +53,7 @@ static void on_audio_data(const float *samples, size_t num_samples, void *user_d
         if (audio_buffer_pos >= AUDIO_CHUNK_SIZE) {
             /* Process with Whisper */
             if (g_whisper) {
-                whisper_process(g_whisper, audio_buffer, audio_buffer_pos);
+                whisper_engine_process(g_whisper, audio_buffer, audio_buffer_pos);
             }
 
             /* Overlap: keep last 1 second for context */
@@ -105,9 +105,9 @@ int main(int argc, char *argv[]) {
     ipc_send_status("Initializing Whisper...");
 
     /* Initialize Whisper */
-    g_whisper = whisper_init(model_path, on_transcription, NULL);
+    g_whisper = whisper_engine_init(model_path, on_transcription, NULL);
     if (!g_whisper) {
-        fprintf(stderr, "[Main] Failed to initialize Whisper: %s\n", whisper_get_error());
+        fprintf(stderr, "[Main] Failed to initialize Whisper: %s\n", whisper_engine_get_error());
         ipc_send_error("Failed to initialize Whisper");
         ipc_cleanup();
         return 1;
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
     if (!g_audio) {
         fprintf(stderr, "[Main] Failed to initialize audio: %s\n", audio_get_error());
         ipc_send_error("Failed to initialize audio capture");
-        whisper_cleanup(g_whisper);
+        whisper_engine_cleanup(g_whisper);
         ipc_cleanup();
         return 1;
     }
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "[Main] Failed to start audio: %s\n", audio_get_error());
         ipc_send_error("Failed to start audio capture");
         audio_cleanup(g_audio);
-        whisper_cleanup(g_whisper);
+        whisper_engine_cleanup(g_whisper);
         ipc_cleanup();
         return 1;
     }
@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
 
     audio_stop(g_audio);
     audio_cleanup(g_audio);
-    whisper_cleanup(g_whisper);
+    whisper_engine_cleanup(g_whisper);
     ipc_cleanup();
 
     fprintf(stderr, "[Main] Goodbye!\n");

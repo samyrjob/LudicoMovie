@@ -17,7 +17,7 @@ typedef void (*transcription_callback_t)(const char *text, void *user_data);
  * @param user_data User data to pass to callback
  * @return Whisper engine context or NULL on failure
  */
-whisper_engine_t* whisper_init(const char *model_path, transcription_callback_t callback, void *user_data);
+whisper_engine_t* whisper_engine_init(const char *model_path, transcription_callback_t callback, void *user_data);
 
 /**
  * Process audio samples for transcription
@@ -26,18 +26,18 @@ whisper_engine_t* whisper_init(const char *model_path, transcription_callback_t 
  * @param num_samples Number of samples
  * @return true on success, false on failure
  */
-bool whisper_process(whisper_engine_t *engine, const float *samples, size_t num_samples);
+bool whisper_engine_process(whisper_engine_t *engine, const float *samples, size_t num_samples);
 
 /**
  * Cleanup Whisper engine
  * @param engine Whisper engine context
  */
-void whisper_cleanup(whisper_engine_t *engine);
+void whisper_engine_cleanup(whisper_engine_t *engine);
 
 /**
  * Get last error message
  * @return Error message string
  */
-const char* whisper_get_error(void);
+const char* whisper_engine_get_error(void);
 
 #endif /* WHISPER_ENGINE_H */
