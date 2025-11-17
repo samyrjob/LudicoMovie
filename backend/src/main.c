@@ -14,7 +14,8 @@ static whisper_engine_t *g_whisper = NULL;
 static volatile sig_atomic_t g_running = 1;
 
 /* Configuration */
-#define DEFAULT_MODEL_PATH "models/whisper-base.en.gguf"
+#define DEFAULT_MODEL_PATH "models/whisper-base.gguf"
+#define DEFAULT_LANGUAGE NULL  /* Auto-detect language */
 #define AUDIO_CHUNK_SIZE (AUDIO_SAMPLE_RATE * 3)  /* 3 seconds */
 
 /* Audio buffer for accumulation */
@@ -69,16 +70,23 @@ static void print_usage(const char *prog) {
     fprintf(stderr, "Usage: %s [options]\n", prog);
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -m MODEL    Path to Whisper model (default: %s)\n", DEFAULT_MODEL_PATH);
+    fprintf(stderr, "  -l LANG     Language code (en, fr, es, etc.) or 'auto' for auto-detect (default: auto)\n");
     fprintf(stderr, "  -h          Show this help\n");
 }
 
 int main(int argc, char *argv[]) {
     const char *model_path = DEFAULT_MODEL_PATH;
+    const char *language = DEFAULT_LANGUAGE;
 
     /* Parse command line arguments */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
             model_path = argv[++i];
+        } else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc) {
+            language = argv[++i];
+            if (strcmp(language, "auto") == 0) {
+                language = NULL;  /* Auto-detect */
+            }
         } else if (strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
             return 0;
@@ -105,7 +113,7 @@ int main(int argc, char *argv[]) {
     ipc_send_status("Initializing Whisper...");
 
     /* Initialize Whisper */
-    g_whisper = whisper_engine_init(model_path, on_transcription, NULL);
+    g_whisper = whisper_engine_init(model_path, language, on_transcription, NULL);
     if (!g_whisper) {
         fprintf(stderr, "[Main] Failed to initialize Whisper: %s\n", whisper_engine_get_error());
         ipc_send_error("Failed to initialize Whisper");

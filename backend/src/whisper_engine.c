@@ -16,7 +16,7 @@ struct whisper_engine {
 
 static char last_error[256] = {0};
 
-whisper_engine_t* whisper_engine_init(const char *model_path, transcription_callback_t callback, void *user_data) {
+whisper_engine_t* whisper_engine_init(const char *model_path, const char *language, transcription_callback_t callback, void *user_data) {
     if (!model_path || !callback) {
         snprintf(last_error, sizeof(last_error), "Invalid parameters");
         return NULL;
@@ -47,7 +47,16 @@ whisper_engine_t* whisper_engine_init(const char *model_path, transcription_call
     engine->wparams.print_realtime = false;
     engine->wparams.print_timestamps = false;
     engine->wparams.translate = false;
-    engine->wparams.language = "en";  /* English by default */
+
+    /* Set language (NULL = auto-detect) */
+    if (language && strlen(language) > 0) {
+        engine->wparams.language = language;
+        fprintf(stderr, "[Whisper] Language set to: %s\n", language);
+    } else {
+        engine->wparams.language = NULL;  /* Auto-detect */
+        fprintf(stderr, "[Whisper] Language: auto-detect\n");
+    }
+
     engine->wparams.n_threads = 4;
     engine->wparams.no_context = true;
     engine->wparams.single_segment = false;

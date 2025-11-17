@@ -13,11 +13,12 @@ typedef void (*transcription_callback_t)(const char *text, void *user_data);
 /**
  * Initialize Whisper engine
  * @param model_path Path to Whisper model file (.gguf)
+ * @param language Language code (e.g., "en", "fr", "es") or NULL for auto-detect
  * @param callback Function to call when transcription is ready
  * @param user_data User data to pass to callback
  * @return Whisper engine context or NULL on failure
  */
-whisper_engine_t* whisper_engine_init(const char *model_path, transcription_callback_t callback, void *user_data);
+whisper_engine_t* whisper_engine_init(const char *model_path, const char *language, transcription_callback_t callback, void *user_data);
 
 /**
  * Process audio samples for transcription

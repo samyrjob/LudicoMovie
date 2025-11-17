@@ -47,11 +47,14 @@ function createWindow() {
 function startBackend() {
     // Path to the C backend executable
     const backendPath = path.join(__dirname, '../../build/visualia');
-    const modelPath = path.join(__dirname, '../../models/whisper-base.en.gguf');
+    const modelPath = path.join(__dirname, '../../models/whisper-base.gguf');
+    const language = process.env.VISUALIA_LANG || 'auto';  // Default to auto-detect
 
     console.log('[Electron] Starting backend:', backendPath);
+    console.log('[Electron] Model:', modelPath);
+    console.log('[Electron] Language:', language);
 
-    backendProcess = spawn(backendPath, ['-m', modelPath], {
+    backendProcess = spawn(backendPath, ['-m', modelPath, '-l', language], {
         stdio: ['pipe', 'pipe', 'pipe']
     });
 
