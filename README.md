@@ -71,22 +71,41 @@ bash scripts/build.sh
 
 ### Start the application
 ```bash
-# Start frontend (automatically launches backend)
+# Start frontend (automatically launches backend with auto-detect)
 cd frontend
 npm start
 
-# Backend will look for model at: models/whisper-base.en.gguf
-# Subtitles will appear at the bottom of your screen
+# Specify language
+VISUALIA_LANG=fr npm start  # French
+VISUALIA_LANG=es npm start  # Spanish
+VISUALIA_LANG=ja npm start  # Japanese
 ```
 
 ### Standalone Backend Testing
 ```bash
-# Run backend independently
-./build/visualia -m models/whisper-base.en.gguf
+# Auto-detect language (default)
+./build/visualia
 
-# Backend outputs JSON to stdout
-# stderr shows debug logs
+# Specific language
+./build/visualia -l fr      # French
+./build/visualia -l es      # Spanish
+./build/visualia -l en      # English
+
+# Custom model
+./build/visualia -m models/whisper-small.gguf -l auto
+
+# Show help
+./build/visualia -h
 ```
+
+### Language Support
+VisualIA supports **99 languages** including:
+- English, French, Spanish, German, Italian, Portuguese
+- Chinese, Japanese, Korean
+- Arabic, Hindi, Russian
+- And many more!
+
+See [LANGUAGES.md](LANGUAGES.md) for the complete list and usage details.
 
 ## Development Status
 
