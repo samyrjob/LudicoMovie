@@ -130,20 +130,33 @@ static void translation_worker(translation_engine_t *engine) {
         tokens.resize(n_tokens);
         std::cerr << "[Translation] [TOKENIZE] Success - " << n_tokens << " tokens" << std::endl;
 
-        // Prepare batch
-        std::cerr << "[Translation] [DECODE] Preparing batch with " << n_tokens << " tokens..." << std::endl;
+        // Prepare batch for encoder
+        std::cerr << "[Translation] [ENCODE] Preparing batch with " << n_tokens << " tokens..." << std::endl;
         llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
 
-        // Decode
-        std::cerr << "[Translation] [DECODE] Starting initial decode..." << std::endl;
-        if (llama_decode(engine->ctx, batch) != 0) {
-            std::cerr << "[Translation] [ERROR] Initial decode failed" << std::endl;
+        // Encode the input prompt (MT5 is encoder-decoder model)
+        std::cerr << "[Translation] [ENCODE] Starting encoder..." << std::endl;
+        if (llama_encode(engine->ctx, batch) != 0) {
+            std::cerr << "[Translation] [ERROR] Encoding failed" << std::endl;
             if (engine->callback) {
                 engine->callback("[Translation Error]", engine->user_data);
             }
             continue;
         }
-        std::cerr << "[Translation] [DECODE] Initial decode success" << std::endl;
+        std::cerr << "[Translation] [ENCODE] Encoding success" << std::endl;
+
+        // Start decoder with BOS token
+        std::cerr << "[Translation] [DECODE] Initializing decoder..." << std::endl;
+        llama_token bos_token = llama_vocab_bos(llama_model_get_vocab(engine->model));
+        batch = llama_batch_get_one(&bos_token, 1);
+        if (llama_decode(engine->ctx, batch) != 0) {
+            std::cerr << "[Translation] [ERROR] Initial decoder step failed" << std::endl;
+            if (engine->callback) {
+                engine->callback("[Translation Error]", engine->user_data);
+            }
+            continue;
+        }
+        std::cerr << "[Translation] [DECODE] Decoder initialized" << std::endl;
 
         // Generate translation (max 256 tokens)
         std::cerr << "[Translation] [GENERATE] Starting generation (max 256 tokens)..." << std::endl;
