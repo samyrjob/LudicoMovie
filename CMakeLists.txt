@@ -51,6 +51,7 @@ set(SOURCES
     backend/src/audio.c
     backend/src/whisper_engine.c
     backend/src/ipc.c
+    backend/src/translation_engine.cpp
 )
 
 # Main executable

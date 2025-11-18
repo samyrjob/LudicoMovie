@@ -12,14 +12,17 @@ function createWindow() {
 
     mainWindow = new BrowserWindow({
         width: width,
-        height: 150,  // Height for subtitle bar
+        height: height,  // Full screen height to show controls
         x: 0,
-        y: height - 150,  // Position at bottom of screen
+        y: 0,  // Position at top of screen
         transparent: true,
+        backgroundColor: '#00000000',  // Fully transparent background
         frame: false,
         alwaysOnTop: true,
         skipTaskbar: true,
         resizable: false,
+        hasShadow: false,  // Disable window shadow
+        vibrancy: null,  // Disable macOS vibrancy effects
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
@@ -50,12 +53,26 @@ function startBackend() {
     const modelFile = process.env.VISUALIA_MODEL || 'whisper-base.gguf';
     const modelPath = path.join(__dirname, '../../models', modelFile);
     const language = process.env.VISUALIA_LANG || 'auto';  // Default to auto-detect
+    const targetLang = process.env.VISUALIA_TARGET_LANG || null;  // Translation target
+    const translationModel = process.env.VISUALIA_TRANSLATION_MODEL || 'mt5-small';  // Translation model
 
     console.log('[Electron] Starting backend:', backendPath);
     console.log('[Electron] Model:', modelPath);
     console.log('[Electron] Language:', language);
 
-    backendProcess = spawn(backendPath, ['-m', modelPath, '-l', language], {
+    // Build backend arguments
+    const args = ['-m', modelPath, '-l', language];
+
+    // Add translation if enabled
+    if (targetLang) {
+        const translationModelPath = path.join(__dirname, '../../models', `${translationModel}.gguf`);
+        console.log('[Electron] Translation enabled:', language, '→', targetLang);
+        console.log('[Electron] Translation model:', translationModelPath);
+        args.push('-t', targetLang);
+        args.push('-T', translationModelPath);
+    }
+
+    backendProcess = spawn(backendPath, args, {
         stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -66,6 +83,12 @@ function startBackend() {
     backendIPC.on('transcription', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('transcription', data);
+        }
+    });
+
+    backendIPC.on('translation', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('translation', data);
         }
     });
 
@@ -80,6 +103,24 @@ function startBackend() {
         console.error('[Backend Error]', data.message);
         if (mainWindow) {
             mainWindow.webContents.send('error', data);
+        }
+    });
+
+    backendIPC.on('language_detected', (data) => {
+        console.log('[Backend] Language detected:', data.language);
+        if (mainWindow) {
+            mainWindow.webContents.send('language_detected', data);
+        }
+
+        // Auto-switch to language-specific model if in auto mode
+        const currentLang = process.env.VISUALIA_LANG || 'auto';
+        if (currentLang === 'auto' && data.language) {
+            console.log('[Electron] Auto-switching to language:', data.language);
+            stopBackend();
+            process.env.VISUALIA_LANG = data.language;
+            setTimeout(() => {
+                startBackend();
+            }, 1000);
         }
     });
 
@@ -164,6 +205,24 @@ ipcMain.on('change-source-lang', (event, lang) => {
     stopBackend();
 
     process.env.VISUALIA_LANG = lang;
+
+    setTimeout(() => {
+        startBackend();
+    }, 1000);
+});
+
+// Handle translation enable/disable and target language change
+ipcMain.on('change-translation', (event, config) => {
+    console.log('[Electron] Translation settings:', config);
+    stopBackend();
+
+    if (config.enabled && config.targetLang && config.targetLang !== 'none') {
+        process.env.VISUALIA_TARGET_LANG = config.targetLang;
+        process.env.VISUALIA_TRANSLATION_MODEL = config.translationModel || 'mt5-small';
+    } else {
+        delete process.env.VISUALIA_TARGET_LANG;
+        delete process.env.VISUALIA_TRANSLATION_MODEL;
+    }
 
     setTimeout(() => {
         startBackend();

@@ -14,6 +14,8 @@ const sourceLangSelect = document.getElementById('source-lang-select');
 const targetLangSelect = document.getElementById('target-lang-select');
 const translationToggle = document.getElementById('translation-toggle');
 const targetLangGroup = document.getElementById('target-lang-group');
+const translationModelSelect = document.getElementById('translation-model-select');
+const translationModelGroup = document.getElementById('translation-model-group');
 const controls = document.getElementById('controls');
 
 // State
@@ -22,7 +24,8 @@ let currentSettings = {
     model: 'base',
     sourceLang: 'auto',
     targetLang: 'en',
-    translationEnabled: false
+    translationEnabled: false,
+    translationModel: 'mt5-small'
 };
 
 // Translation cache
@@ -38,9 +41,11 @@ function loadSettings() {
             sourceLangSelect.value = currentSettings.sourceLang;
             targetLangSelect.value = currentSettings.targetLang;
             translationToggle.checked = currentSettings.translationEnabled || false;
+            translationModelSelect.value = currentSettings.translationModel || 'mt5-small';
 
             // Show/hide target language dropdown based on toggle
             targetLangGroup.style.display = translationToggle.checked ? 'flex' : 'none';
+            translationModelGroup.style.display = translationToggle.checked ? 'flex' : 'none';
         } catch (e) {
             console.error('[Renderer] Failed to load settings:', e);
         }
@@ -52,70 +57,35 @@ function saveSettings() {
     localStorage.setItem('visualia-settings', JSON.stringify(currentSettings));
 }
 
-// Translate text using a local/free translation service
-async function translateText(text, targetLang) {
-    if (!text || targetLang === 'none') return null;
-
-    // Check cache
+// Translation is now handled by the backend via T5 model
+// Translations will arrive via IPC 'translation' events
+// This function is kept for cache management only
+function getCachedTranslation(text, targetLang) {
     const cacheKey = `${text}:${targetLang}`;
-    if (translationCache.has(cacheKey)) {
-        return translationCache.get(cacheKey);
-    }
+    return translationCache.get(cacheKey);
+}
 
-    try {
-        // Using LibreTranslate API (free, self-hostable)
-        // You can also use Google Translate, DeepL, or run local models
-        const response = await fetch('https://libretranslate.com/translate', {
-            method: 'POST',
-            body: JSON.stringify({
-                q: text,
-                source: 'auto',
-                target: targetLang,
-                format: 'text'
-            }),
-            headers: { 'Content-Type': 'application/json' }
-        });
+function cacheTranslation(text, targetLang, translation) {
+    const cacheKey = `${text}:${targetLang}`;
+    translationCache.set(cacheKey, translation);
 
-        if (!response.ok) {
-            throw new Error(`Translation API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const translation = data.translatedText;
-
-        // Cache the result
-        translationCache.set(cacheKey, translation);
-
-        // Limit cache size
-        if (translationCache.size > 100) {
-            const firstKey = translationCache.keys().next().value;
-            translationCache.delete(firstKey);
-        }
-
-        return translation;
-    } catch (error) {
-        console.error('[Renderer] Translation error:', error);
-        return null;
+    // Limit cache size
+    if (translationCache.size > 100) {
+        const firstKey = translationCache.keys().next().value;
+        translationCache.delete(firstKey);
     }
 }
 
 // Update subtitle display
-async function showSubtitle(text) {
+function showSubtitle(text) {
     originalText.textContent = text;
     subtitleBox.classList.remove('hidden');
     subtitleBox.classList.add('fade-in');
 
-    // Handle translation
+    // Show translation row if enabled (translation will come via IPC)
     if (currentSettings.translationEnabled && currentSettings.targetLang !== 'none') {
         translationRow.style.display = 'flex';
         translationText.textContent = 'Translating...';
-
-        const translated = await translateText(text, currentSettings.targetLang);
-        if (translated) {
-            translationText.textContent = translated;
-        } else {
-            translationText.textContent = '[Translation unavailable]';
-        }
     } else {
         translationRow.style.display = 'none';
     }
@@ -168,11 +138,27 @@ translationToggle.addEventListener('change', (e) => {
 
     if (e.target.checked) {
         targetLangGroup.style.display = 'flex';
+        translationModelGroup.style.display = 'flex';
         updateStatus(`Translation enabled - ${targetLangSelect.options[targetLangSelect.selectedIndex].text}`);
+
+        // Enable translation in backend
+        ipcRenderer.send('change-translation', {
+            enabled: true,
+            targetLang: currentSettings.targetLang,
+            translationModel: currentSettings.translationModel
+        });
     } else {
         targetLangGroup.style.display = 'none';
+        translationModelGroup.style.display = 'none';
         translationRow.style.display = 'none';
         updateStatus('Translation disabled');
+
+        // Disable translation in backend
+        ipcRenderer.send('change-translation', {
+            enabled: false,
+            targetLang: null,
+            translationModel: null
+        });
     }
 });
 
@@ -181,6 +167,31 @@ targetLangSelect.addEventListener('change', (e) => {
     currentSettings.targetLang = e.target.value;
     saveSettings();
     updateStatus(`Translating to ${e.target.options[e.target.selectedIndex].text}`);
+
+    // Update translation target in backend if translation is enabled
+    if (currentSettings.translationEnabled) {
+        ipcRenderer.send('change-translation', {
+            enabled: true,
+            targetLang: currentSettings.targetLang,
+            translationModel: currentSettings.translationModel
+        });
+    }
+});
+
+// Handle translation model change
+translationModelSelect.addEventListener('change', (e) => {
+    currentSettings.translationModel = e.target.value;
+    saveSettings();
+    updateStatus(`Switching to ${e.target.options[e.target.selectedIndex].text}...`);
+
+    // Update translation model in backend if translation is enabled
+    if (currentSettings.translationEnabled) {
+        ipcRenderer.send('change-translation', {
+            enabled: true,
+            targetLang: currentSettings.targetLang,
+            translationModel: currentSettings.translationModel
+        });
+    }
 });
 
 // Fix click-through: Enable mouse events when hovering over controls
@@ -198,6 +209,21 @@ ipcRenderer.on('transcription', (event, data) => {
     showSubtitle(data.text);
 });
 
+// Handle translation from backend (T5 model)
+ipcRenderer.on('translation', (event, data) => {
+    console.log('[Renderer] Translation:', data.original, '→', data.text);
+
+    // Update translation display
+    if (translationRow.style.display === 'flex') {
+        translationText.textContent = data.text;
+
+        // Cache the translation
+        if (currentSettings.targetLang) {
+            cacheTranslation(data.original, currentSettings.targetLang, data.text);
+        }
+    }
+});
+
 // Handle status updates
 ipcRenderer.on('status', (event, data) => {
     console.log('[Renderer] Status:', data.message);
@@ -208,6 +234,12 @@ ipcRenderer.on('status', (event, data) => {
 ipcRenderer.on('error', (event, data) => {
     console.error('[Renderer] Error:', data.message);
     updateStatus(data.message, true);
+});
+
+// Handle language detection
+ipcRenderer.on('language_detected', (event, data) => {
+    console.log('[Renderer] Language detected:', data.language);
+    updateStatus(`Detected language: ${data.language} - Switching model...`);
 });
 
 // Initialize

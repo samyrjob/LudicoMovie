@@ -8,39 +8,59 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # Build backend
 echo -e "${BLUE}[1/3] Building C backend...${NC}"
+cd "$PROJECT_ROOT"
 mkdir -p build
 cd build
 cmake ..
 cmake --build . -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
-cd ..
+cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}✓ Backend built successfully${NC}"
 
 # Install frontend dependencies
 echo -e "${BLUE}[2/3] Installing frontend dependencies...${NC}"
-cd frontend
+cd "$PROJECT_ROOT/frontend"
 npm install
-cd ..
+cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}✓ Frontend dependencies installed${NC}"
 
-# Download model (if not exists)
-echo -e "${BLUE}[3/3] Checking for Whisper model...${NC}"
-MODEL_DIR="models"
-MODEL_FILE="whisper-base.en.gguf"
+# Check for models
+echo -e "${BLUE}[3/3] Checking for AI models...${NC}"
+MODEL_DIR="$PROJECT_ROOT/models"
+mkdir -p "$MODEL_DIR"
 
-if [ ! -f "$MODEL_DIR/$MODEL_FILE" ]; then
-    echo "Whisper model not found."
+# Check for Whisper models
+WHISPER_MODELS=$(ls -1 "$MODEL_DIR"/whisper-*.gguf 2>/dev/null || true)
+if [ -z "$WHISPER_MODELS" ]; then
+    echo "⚠️  No Whisper models found."
     echo "Please download from: https://huggingface.co/ggerganov/whisper.cpp/tree/main"
-    echo "Place the model in: $MODEL_DIR/$MODEL_FILE"
     echo ""
-    echo "Suggested command:"
-    echo "  wget -P models https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
-    echo "  mv models/ggml-base.en.bin models/whisper-base.en.gguf"
+    echo "Recommended: whisper-base.gguf (141MB)"
+    echo "  wget -P models https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+    echo "  mv models/ggml-base.bin models/whisper-base.gguf"
 else
-    echo -e "${GREEN}✓ Model found: $MODEL_DIR/$MODEL_FILE${NC}"
+    echo -e "${GREEN}✓ Whisper models found:${NC}"
+    ls -1h "$MODEL_DIR"/whisper-*.gguf | sed 's/^/  /'
+fi
+
+# Check for translation models
+MT5_MODELS=$(ls -1 "$MODEL_DIR"/mt5-*.gguf 2>/dev/null || true)
+if [ -z "$MT5_MODELS" ]; then
+    echo ""
+    echo "ℹ️  No translation models found (optional)"
+    echo "To enable translation, run:"
+    echo "  bash scripts/setup_t5_translation.sh"
+else
+    echo ""
+    echo -e "${GREEN}✓ Translation models found:${NC}"
+    ls -1h "$MODEL_DIR"/mt5-*.gguf | sed 's/^/  /'
 fi
 
 echo ""

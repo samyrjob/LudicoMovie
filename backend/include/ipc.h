@@ -40,6 +40,22 @@ bool ipc_send_error(const char *error_msg);
 bool ipc_send_status(const char *status);
 
 /**
+ * Send translation result to frontend
+ * @param translated_text Translated text
+ * @param original_text Original text that was translated
+ * @param timestamp Unix timestamp
+ * @return true on success, false on failure
+ */
+bool ipc_send_translation(const char *translated_text, const char *original_text, long timestamp);
+
+/**
+ * Send detected language to frontend
+ * @param language Language code (e.g., "en", "fr")
+ * @return true on success, false on failure
+ */
+bool ipc_send_language_detected(const char *language);
+
+/**
  * Check for incoming messages from frontend (non-blocking)
  * @return true if message received and handled, false otherwise
  */

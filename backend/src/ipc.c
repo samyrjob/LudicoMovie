@@ -65,6 +65,33 @@ bool ipc_send_status(const char *status) {
     return true;
 }
 
+bool ipc_send_translation(const char *translated_text, const char *original_text, long timestamp) {
+    if (!translated_text || !original_text) return false;
+
+    char escaped_translation[4096];
+    char escaped_original[4096];
+    escape_json_string(translated_text, escaped_translation, sizeof(escaped_translation));
+    escape_json_string(original_text, escaped_original, sizeof(escaped_original));
+
+    printf("{\"type\":\"translation\",\"data\":{\"text\":\"%s\",\"original\":\"%s\",\"timestamp\":%ld}}\n",
+           escaped_translation, escaped_original, timestamp);
+    fflush(stdout);
+
+    return true;
+}
+
+bool ipc_send_language_detected(const char *language) {
+    if (!language) return false;
+
+    char escaped[32];
+    escape_json_string(language, escaped, sizeof(escaped));
+
+    printf("{\"type\":\"language_detected\",\"data\":{\"language\":\"%s\"}}\n", escaped);
+    fflush(stdout);
+
+    return true;
+}
+
 bool ipc_poll(void) {
     /* For now, we don't expect messages from frontend */
     /* This can be extended to handle control commands */

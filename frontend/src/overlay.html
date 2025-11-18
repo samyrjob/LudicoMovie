@@ -9,12 +9,15 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            border: none;
+            outline: none;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: transparent;
             overflow: hidden;
+            border: none;
         }
 
         #container {
@@ -25,11 +28,12 @@
             justify-content: flex-end;
             align-items: center;
             padding: 20px;
+            border: none;
         }
 
         /* Controls Panel */
         #controls {
-            position: absolute;
+            position: fixed;
             top: 20px;
             right: 20px;
             display: flex;
@@ -37,6 +41,9 @@
             flex-direction: column;
             align-items: flex-end;
             -webkit-app-region: no-drag;
+            z-index: 9999;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
         }
 
         .control-group {
@@ -48,6 +55,7 @@
             align-items: center;
             gap: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            border: none;
         }
 
         .control-label {
@@ -95,6 +103,11 @@
             align-items: center;
             gap: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            border: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10000;
         }
 
         #status.error {
@@ -121,7 +134,7 @@
             max-width: 90%;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
             transition: opacity 0.3s ease;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: none;
         }
 
         #subtitle-box.hidden {
@@ -320,10 +333,20 @@
                 </select>
             </div>
 
-            <div id="status">
-                <div id="status-dot"></div>
-                <span id="status-text">Initializing...</span>
+            <div class="control-group" id="translation-model-group" style="display: none;">
+                <span class="control-label">Translation Model</span>
+                <select id="translation-model-select">
+                    <option value="mt5-small">MT5-Small (300MB, Fast)</option>
+                    <option value="mt5-base">MT5-Base (580MB, Better)</option>
+                    <option value="mt5-large">MT5-Large (1.2GB, Best)</option>
+                </select>
             </div>
+        </div>
+
+        <!-- Status moved to bottom right -->
+        <div id="status">
+            <div id="status-dot"></div>
+            <span id="status-text">Initializing...</span>
         </div>
 
         <div id="subtitle-box" class="hidden">

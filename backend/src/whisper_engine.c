@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <time.h>
 
 struct whisper_engine {
     struct whisper_context *ctx;
@@ -12,6 +13,8 @@ struct whisper_engine {
     transcription_callback_t callback;
     void *user_data;
     pthread_mutex_t lock;
+    char detected_language[8];  /* Store detected language code */
+    time_t last_detection_time; /* Time of last language detection */
 };
 
 static char last_error[256] = {0};
@@ -65,6 +68,10 @@ whisper_engine_t* whisper_engine_init(const char *model_path, const char *langua
     engine->user_data = user_data;
     pthread_mutex_init(&engine->lock, NULL);
 
+    /* Initialize language detection */
+    memset(engine->detected_language, 0, sizeof(engine->detected_language));
+    engine->last_detection_time = 0;
+
     fprintf(stderr, "[Whisper] Initialized successfully\n");
     return engine;
 }
@@ -77,11 +84,27 @@ bool whisper_engine_process(whisper_engine_t *engine, const float *samples, size
 
     pthread_mutex_lock(&engine->lock);
 
+    /* Check if we should detect language (every 20 seconds) */
+    time_t current_time = time(NULL);
+    bool should_detect = (current_time - engine->last_detection_time >= 20);
+
     /* Run inference */
     if (whisper_full(engine->ctx, engine->wparams, samples, (int)num_samples) != 0) {
         pthread_mutex_unlock(&engine->lock);
         snprintf(last_error, sizeof(last_error), "Whisper inference failed");
         return false;
+    }
+
+    /* Detect language if it's time */
+    if (should_detect && engine->wparams.language == NULL) {
+        int lang_id = whisper_full_lang_id(engine->ctx);
+        const char* lang_str = whisper_lang_str(lang_id);
+        if (lang_str && strlen(lang_str) > 0) {
+            strncpy(engine->detected_language, lang_str, sizeof(engine->detected_language) - 1);
+            engine->detected_language[sizeof(engine->detected_language) - 1] = '\0';
+            engine->last_detection_time = current_time;
+            fprintf(stderr, "[Whisper] Detected language: %s\n", engine->detected_language);
+        }
     }
 
     /* Get transcription results */
@@ -137,4 +160,11 @@ void whisper_engine_cleanup(whisper_engine_t *engine) {
 
 const char* whisper_engine_get_error(void) {
     return last_error;
+}
+
+const char* whisper_engine_get_detected_language(whisper_engine_t *engine) {
+    if (!engine || engine->detected_language[0] == '\0') {
+        return NULL;
+    }
+    return engine->detected_language;
 }

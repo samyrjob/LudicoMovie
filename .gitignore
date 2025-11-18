@@ -12,6 +12,7 @@ dist/
 models/*.bin
 models/*.gguf
 models/*.pt
+models/.hf_cache/
 !models/.gitkeep
 
 # Node modules

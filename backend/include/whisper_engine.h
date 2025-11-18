@@ -41,4 +41,11 @@ void whisper_engine_cleanup(whisper_engine_t *engine);
  */
 const char* whisper_engine_get_error(void);
 
+/**
+ * Get the detected language from the last transcription
+ * @param engine Whisper engine context
+ * @return Language code (e.g., "en", "fr") or NULL if not detected
+ */
+const char* whisper_engine_get_detected_language(whisper_engine_t *engine);
+
 #endif /* WHISPER_ENGINE_H */
