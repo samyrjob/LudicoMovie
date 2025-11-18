@@ -18,12 +18,31 @@ const translationModelSelect = document.getElementById('translation-model-select
 const translationModelGroup = document.getElementById('translation-model-group');
 const controls = document.getElementById('controls');
 
+// Helper function to get smart default target language
+function getSmartTargetLang(sourceLang = 'auto') {
+    // Get system locale (e.g., 'en-US', 'fr-FR')
+    const systemLang = navigator.language.split('-')[0]; // Get 'en' from 'en-US'
+
+    // If source is English or system is English, choose a common alternative
+    if (sourceLang === 'en' || systemLang === 'en') {
+        return systemLang !== 'en' ? systemLang : 'fr'; // Use system lang if not English, else French
+    }
+
+    // If source is known and not English, translate to English
+    if (sourceLang !== 'auto') {
+        return 'en';
+    }
+
+    // Default: if auto-detect, prefer English unless system is already English
+    return systemLang !== 'en' ? 'en' : 'fr';
+}
+
 // State
 let hideTimeout = null;
 let currentSettings = {
     model: 'base',
     sourceLang: 'auto',
-    targetLang: 'en',
+    targetLang: getSmartTargetLang('auto'),
     translationEnabled: false,
     translationModel: 'mt5-small'
 };
@@ -164,7 +183,15 @@ translationToggle.addEventListener('change', (e) => {
 
 // Handle target language change
 targetLangSelect.addEventListener('change', (e) => {
-    currentSettings.targetLang = e.target.value;
+    const newTargetLang = e.target.value;
+
+    // Prevent same-language translation
+    if (newTargetLang === currentSettings.sourceLang && currentSettings.sourceLang !== 'auto') {
+        updateStatus(`Warning: Source and target are both ${currentSettings.sourceLang.toUpperCase()}`, true);
+        console.warn('[Renderer] Same-language translation selected:', currentSettings.sourceLang);
+    }
+
+    currentSettings.targetLang = newTargetLang;
     saveSettings();
     updateStatus(`Translating to ${e.target.options[e.target.selectedIndex].text}`);
 
@@ -239,7 +266,30 @@ ipcRenderer.on('error', (event, data) => {
 // Handle language detection
 ipcRenderer.on('language_detected', (event, data) => {
     console.log('[Renderer] Language detected:', data.language);
-    updateStatus(`Detected language: ${data.language} - Switching model...`);
+
+    const detectedLang = data.language;
+
+    // Update source language in UI (switch from auto to detected)
+    currentSettings.sourceLang = detectedLang;
+    sourceLangSelect.value = detectedLang;
+
+    // Intelligently set target language based on detected source
+    const newTargetLang = getSmartTargetLang(detectedLang);
+
+    // Only update target if it would result in same-language translation
+    if (currentSettings.targetLang === detectedLang) {
+        currentSettings.targetLang = newTargetLang;
+        targetLangSelect.value = newTargetLang;
+        console.log('[Renderer] Adjusted target language to avoid same-language translation:', newTargetLang);
+    } else if (currentSettings.targetLang === 'none' || !currentSettings.targetLang) {
+        // If target was "none", set it to smart default
+        currentSettings.targetLang = newTargetLang;
+        targetLangSelect.value = newTargetLang;
+    }
+
+    saveSettings();
+
+    updateStatus(`Detected: ${detectedLang.toUpperCase()} → Target: ${currentSettings.targetLang.toUpperCase()}`);
 });
 
 // Initialize
