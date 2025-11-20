@@ -7,6 +7,7 @@ const translationText = document.getElementById('translation-text');
 const translationRow = document.getElementById('translation-row');
 const statusElement = document.getElementById('status');
 const statusText = document.getElementById('status-text');
+const statusDot = document.getElementById('status-dot');
 
 // Control elements
 const modelSelect = document.getElementById('model-select');
@@ -16,7 +17,9 @@ const translationToggle = document.getElementById('translation-toggle');
 const targetLangGroup = document.getElementById('target-lang-group');
 const translationModelSelect = document.getElementById('translation-model-select');
 const translationModelGroup = document.getElementById('translation-model-group');
+const soundCaptionsToggle = document.getElementById('sound-captions-toggle');
 const controls = document.getElementById('controls');
+const closeSettingsBtn = document.getElementById('close-settings');
 
 // Helper function to get smart default target language
 function getSmartTargetLang(sourceLang = 'auto') {
@@ -44,7 +47,8 @@ let currentSettings = {
     sourceLang: 'auto',
     targetLang: getSmartTargetLang('auto'),
     translationEnabled: false,
-    translationModel: 'mt5-small'
+    translationModel: 'madlad400-10b-mt',
+    showSoundCaptions: true
 };
 
 // Translation cache
@@ -60,7 +64,8 @@ function loadSettings() {
             sourceLangSelect.value = currentSettings.sourceLang;
             targetLangSelect.value = currentSettings.targetLang;
             translationToggle.checked = currentSettings.translationEnabled || false;
-            translationModelSelect.value = currentSettings.translationModel || 'mt5-small';
+            translationModelSelect.value = currentSettings.translationModel || 'madlad400-10b-mt';
+            soundCaptionsToggle.checked = currentSettings.showSoundCaptions !== false;
 
             // Show/hide target language dropdown based on toggle
             targetLangGroup.style.display = translationToggle.checked ? 'flex' : 'none';
@@ -120,14 +125,28 @@ function showSubtitle(text) {
     }, 5000);
 }
 
-// Update status
+// Update status with fade transition
 function updateStatus(message, isError = false) {
-    statusText.textContent = message;
-    if (isError) {
-        statusElement.classList.add('error');
-    } else {
-        statusElement.classList.remove('error');
+    // Skip if currently showing hint
+    if (isShowingHint) {
+        currentStatusMessage = message;
+        return;
     }
+
+    // Fade out
+    statusText.classList.add('fade-out');
+
+    setTimeout(() => {
+        statusText.textContent = message;
+        if (isError) {
+            statusElement.classList.add('error');
+        } else {
+            statusElement.classList.remove('error');
+        }
+
+        // Fade in
+        statusText.classList.remove('fade-out');
+    }, 200);
 }
 
 // Handle model change
@@ -221,18 +240,49 @@ translationModelSelect.addEventListener('change', (e) => {
     }
 });
 
-// Fix click-through: Enable mouse events when hovering over controls
+// Handle sound captions toggle
+soundCaptionsToggle.addEventListener('change', (e) => {
+    currentSettings.showSoundCaptions = e.target.checked;
+    saveSettings();
+    updateStatus(e.target.checked ? 'Sound captions enabled' : 'Sound captions disabled');
+});
+
+// Close settings button
+closeSettingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    controls.classList.add('hidden');
+});
+
+// Status element reveals settings on hover
+statusElement.addEventListener('mouseenter', () => {
+    controls.classList.remove('hidden');
+    controls.classList.add('show');
+});
+
+// Controls stay visible when hovering over them
 controls.addEventListener('mouseenter', () => {
+    controls.classList.remove('hidden');
+    controls.classList.add('show');
     ipcRenderer.send('toggle-click-through', false);
 });
 
 controls.addEventListener('mouseleave', () => {
+    controls.classList.remove('show');
     ipcRenderer.send('toggle-click-through', true);
 });
 
 // Handle transcription from backend
 ipcRenderer.on('transcription', (event, data) => {
     console.log('[Renderer] Transcription:', data.text);
+
+    // Check if text is a sound caption (text in brackets, asterisks, or parentheses like [silence], *footsteps*, (door closing), etc.)
+    const isSoundCaption = /^(\[.*\]|\*.*\*|\(.*\))$/.test(data.text.trim());
+
+    // Don't show UI if it's a sound caption and the setting is disabled
+    if (isSoundCaption && !currentSettings.showSoundCaptions) {
+        return;
+    }
+
     showSubtitle(data.text);
 });
 
@@ -291,6 +341,52 @@ ipcRenderer.on('language_detected', (event, data) => {
 
     updateStatus(`Detected: ${detectedLang.toUpperCase()} → Target: ${currentSettings.targetLang.toUpperCase()}`);
 });
+
+// Track the original status message
+let currentStatusMessage = '';
+let isShowingHint = false;
+
+// Periodic hint to show users they can hover for settings
+function showStatusHint() {
+    // Only show if controls are not already visible
+    if (!controls.classList.contains('show') && !isShowingHint) {
+        isShowingHint = true;
+        currentStatusMessage = statusText.textContent;
+
+        // Fade out current status
+        statusText.classList.add('fade-out');
+
+        setTimeout(() => {
+            // Hide status dot and change to hint mode
+            statusDot.classList.add('hidden');
+            statusElement.classList.add('hint-mode');
+            statusText.textContent = 'Hover here for settings';
+
+            // Fade in hint
+            statusText.classList.remove('fade-out');
+
+            // After 3 seconds, restore original status
+            setTimeout(() => {
+                // Fade out hint
+                statusText.classList.add('fade-out');
+
+                setTimeout(() => {
+                    // Show status dot and remove hint mode
+                    statusDot.classList.remove('hidden');
+                    statusElement.classList.remove('hint-mode');
+                    statusText.textContent = currentStatusMessage;
+
+                    // Fade in original status
+                    statusText.classList.remove('fade-out');
+                    isShowingHint = false;
+                }, 200);
+            }, 3000); // Show hint for 3 seconds
+        }, 200);
+    }
+}
+
+// Show hint every 40 seconds
+setInterval(showStatusHint, 40000);
 
 // Initialize
 console.log('[Renderer] VisualIA overlay ready');
