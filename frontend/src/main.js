@@ -30,7 +30,12 @@ function createWindow() {
     });
 
     // Make window click-through (non-interactive)
-    mainWindow.setIgnoreMouseEvents(true);
+    // On Windows, we need to pass { forward: true } for proper click-through behavior
+    if (process.platform === 'win32') {
+        mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    } else {
+        mainWindow.setIgnoreMouseEvents(true);
+    }
 
     // Load the overlay UI
     mainWindow.loadFile(path.join(__dirname, 'overlay.html'));
@@ -192,7 +197,16 @@ app.on('before-quit', () => {
 // IPC handlers
 ipcMain.on('toggle-click-through', (event, enabled) => {
     if (mainWindow) {
-        mainWindow.setIgnoreMouseEvents(enabled);
+        // On Windows, we need to pass { forward: true } when enabling click-through
+        if (process.platform === 'win32') {
+            if (enabled) {
+                mainWindow.setIgnoreMouseEvents(true, { forward: true });
+            } else {
+                mainWindow.setIgnoreMouseEvents(false);
+            }
+        } else {
+            mainWindow.setIgnoreMouseEvents(enabled);
+        }
     }
 });
 

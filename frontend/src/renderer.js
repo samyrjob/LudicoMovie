@@ -7,7 +7,9 @@ const translationText = document.getElementById('translation-text');
 const translationRow = document.getElementById('translation-row');
 const statusElement = document.getElementById('status');
 const statusText = document.getElementById('status-text');
-n
+const statusDot = document.getElementById('status-dot');
+const subtitleContainer = document.getElementById('subtitle-container');
+
 // Control elements
 const modelSelect = document.getElementById('model-select');
 const sourceLangSelect = document.getElementById('source-lang-select');
@@ -47,7 +49,7 @@ let currentSettings = {
     sourceLang: 'auto',
     targetLang: getSmartTargetLang('auto'),
     translationEnabled: false,
-    captionHistory: false
+    captionHistory: false,
     translationModel: 'madlad400-10b-mt',
     showSoundCaptions: true
 
@@ -75,8 +77,7 @@ function loadSettings() {
             soundCaptionsToggle.checked = currentSettings.showSoundCaptions !== false;
             captionHistoryToggle.checked = currentSettings.captionHistory || false;
 
-            // Show/hide target language dro
-            pdown based on toggle
+            // Show/hide target language dropdown based on toggle
             targetLangGroup.style.display = translationToggle.checked ? 'flex' : 'none';
             translationModelGroup.style.display = translationToggle.checked ? 'flex' : 'none';
         } catch (e) {
@@ -443,6 +444,19 @@ closeSettingsBtn.addEventListener('click', (e) => {
 statusElement.addEventListener('mouseenter', () => {
     controls.classList.remove('hidden');
     controls.classList.add('show');
+    // Disable click-through so controls are interactive on Windows
+    ipcRenderer.send('toggle-click-through', false);
+});
+
+statusElement.addEventListener('mouseleave', (e) => {
+    // Small delay to allow moving to controls
+    setTimeout(() => {
+        // If not hovering over controls, hide them and re-enable click-through
+        if (!controls.matches(':hover')) {
+            controls.classList.remove('show');
+            ipcRenderer.send('toggle-click-through', true);
+        }
+    }, 100);
 });
 
 // Controls stay visible when hovering over them
